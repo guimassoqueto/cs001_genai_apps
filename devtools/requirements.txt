@@ -1,6 +1,7 @@
 # Runtime
 langchain==1.4.3
 langchain-anthropic==1.7.5
+pandas
 python-dotenv
 
 # Tooling
