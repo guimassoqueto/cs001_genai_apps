@@ -8,9 +8,10 @@ PIP_REVIEW=$(VENV)/bin/pip-review
 CZ=$(VENV)/bin/cz
 
 CONFIG=devtools/pyproject.toml
+LESSONS=lessons
 REQUIREMENTS=devtools/requirements.txt
 
-.PHONY: venv env install reinstall hooks update-hooks lint lint-check commit check-updates main
+.PHONY: venv env install reinstall hooks update-hooks lint lint-check commit check-updates main lesson clean-output
 
 venv:
 	@python -m venv $(VENV)
@@ -48,3 +49,13 @@ check-updates:
 
 main:
 	@$(PYTHON) main.py
+
+# Remove every output/ folder under lessons/ and the files they hold.
+# Rerun a lesson to regenerate just that lesson's output.
+clean-output:
+	@dirs=$$(find $(LESSONS) -type d -name output -prune 2>/dev/null); \
+	if [ -z "$$dirs" ]; then \
+		echo "no output folders to remove"; \
+	else \
+		echo "$$dirs" | while read -r dir; do echo "removing $$dir"; rm -rf "$$dir"; done; \
+	fi
