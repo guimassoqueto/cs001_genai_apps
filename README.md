@@ -21,6 +21,12 @@ Then put your key in `.env`:
 ANTHROPIC_API_KEY="sk-ant-..."
 ```
 
+On commit, the pre-commit hook fixes the staged files (trailing whitespace, final
+newline, `ruff check --fix`, `ruff format`) and re-stages the fixes, so the commit only
+fails on issues that cannot be fixed automatically. A file with extra unstaged edits is
+not re-staged (that would clash with pre-commit's stash): stage the whole file and
+commit again.
+
 ## Usage
 
 | Command              | Does                                                        |

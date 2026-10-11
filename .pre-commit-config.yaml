@@ -2,20 +2,46 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
-      - id: end-of-file-fixer
-      - id: trailing-whitespace
       - id: check-yaml
       - id: check-toml
       - id: check-added-large-files
       - id: detect-private-key
 
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.10
+  # Fixers: they fix the staged files and re-stage the fixes instead of failing, and
+  # fail only on issues they cannot fix (see devtools/fix-staged.sh).
+  # ruff comes from the venv, so it always matches `make lint`.
+  - repo: local
     hooks:
+      - id: end-of-file-fixer
+        name: fix end of files
+        entry: devtools/fix-staged.sh end-of-file-fixer --
+        language: python
+        additional_dependencies: [pre-commit-hooks==6.0.0]
+        types: [text]
+        stages: [pre-commit]
+        require_serial: true
+      - id: trailing-whitespace
+        name: trim trailing whitespace
+        entry: devtools/fix-staged.sh trailing-whitespace-fixer --
+        language: python
+        additional_dependencies: [pre-commit-hooks==6.0.0]
+        types: [text]
+        stages: [pre-commit]
+        require_serial: true
       - id: ruff-check
-        args: [--fix, --config, devtools/pyproject.toml]
+        name: ruff check --fix
+        entry: devtools/fix-staged.sh .venv/bin/ruff check --fix --force-exclude --config devtools/pyproject.toml --
+        language: system
+        types_or: [python, pyi]
+        stages: [pre-commit]
+        require_serial: true
       - id: ruff-format
-        args: [--config, devtools/pyproject.toml]
+        name: ruff format
+        entry: devtools/fix-staged.sh .venv/bin/ruff format --force-exclude --config devtools/pyproject.toml --
+        language: system
+        types_or: [python, pyi]
+        stages: [pre-commit]
+        require_serial: true
 
   - repo: https://github.com/commitizen-tools/commitizen
     rev: v4.19.2
