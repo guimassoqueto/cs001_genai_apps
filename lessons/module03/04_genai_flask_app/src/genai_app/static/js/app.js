@@ -1,156 +1,179 @@
-'use strict';
+// Entry point: wires the page together and sends messages.
+import { ApiError, requestJson, streamEvents } from './api.js';
+import { Comparison, SingleAnswer, errorMessage, userMessage } from './components.js';
+import { Controls } from './controls.js';
+import { StatsDialog } from './stats.js';
 
-const { generateUrl, modelName } = window.APP_CONFIG;
+const CONFIG = window.APP_CONFIG;
+const MODELS = new Map(CONFIG.models.map((m) => [m.id, m]));
 
+const $ = (id) => document.getElementById(id);
 const els = {
-    welcomeScreen: document.getElementById('welcomeScreen'),
-    messagesContainer: document.getElementById('messagesContainer'),
-    loadingIndicator: document.getElementById('loadingIndicator'),
-    messagesEnd: document.getElementById('messagesEnd'),
-    clearBtn: document.getElementById('clearBtn'),
-    chatForm: document.getElementById('chatForm'),
-    messageInput: document.getElementById('messageInput'),
-    sendButton: document.getElementById('sendButton'),
-    sendIcon: document.getElementById('sendIcon'),
-    loadingSpinner: document.getElementById('loadingSpinner'),
+    messagesArea: document.querySelector('.messages-area'),
+    welcomeScreen: $('welcomeScreen'),
+    messagesContainer: $('messagesContainer'),
+    clearBtn: $('clearBtn'),
+    chatForm: $('chatForm'),
+    messageInput: $('messageInput'),
+    sendButton: $('sendButton'),
+    sendIcon: $('sendIcon'),
+    loadingSpinner: $('loadingSpinner'),
 };
 
-const ICONS = {
-    user: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
-    ai: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>',
+const controls = new Controls(
+    {
+        abToggle: $('abToggle'),
+        streamToggle: $('streamToggle'),
+        singlePicker: $('singlePicker'),
+        abPicker: $('abPicker'),
+        modelSelect: $('modelSelect'),
+        abCheckboxes: [...document.querySelectorAll('input[name="abModels"]')],
+        hint: $('controlsHint'),
+    },
+    updateSendButton,
+);
+
+const stats = new StatsDialog(
+    { openButton: $('statsBtn'), dialog: $('statsDialog'), closeButton: $('statsClose'), body: $('statsBody') },
+    CONFIG.urls.stats,
+);
+
+const chat = {
+    conversationId: null, // issued by the server with the first answer; the memory lives under it
+    inFlight: null, // AbortController of the request being answered
 };
 
-let isLoading = false;
+const withId = (url, id) => url.replace(CONFIG.idPlaceholder, encodeURIComponent(id));
 
-// --- Helpers ---------------------------------------------------------------
+// --- Sending a message -------------------------------------------------------
 
-// Creates an element; text always goes through textContent, so model output is never parsed as HTML.
-function el(tag, className, text) {
-    const node = document.createElement(tag);
-    if (className) node.className = className;
-    if (text !== undefined) node.textContent = text;
-    return node;
-}
+async function send(content) {
+    const compare = controls.compare;
+    const models = controls.models.map((id) => MODELS.get(id));
+    const view = compare ? new Comparison(models, vote) : new SingleAnswer(models[0]);
 
-function sentimentLevel(score) {
-    if (score < 40) return 'negative';
-    if (score > 60) return 'positive';
-    return 'neutral';
-}
+    const url = compare ? CONFIG.urls.compare : CONFIG.urls.generate;
+    const body = {
+        message: content,
+        ...(compare ? { models: models.map((m) => m.id) } : { model: models[0].id }),
+        ...(chat.conversationId && { conversation_id: chat.conversationId }),
+    };
+    chat.inFlight = new AbortController();
+    const options = { signal: chat.inFlight.signal };
 
-function scrollToBottom() {
-    els.messagesEnd.scrollIntoView({ behavior: 'smooth' });
-}
+    append(userMessage(content));
+    append(view.element);
+    clearInput();
+    setBusy(true);
 
-// --- Rendering -------------------------------------------------------------
-
-function renderAnalysis(analysis) {
-    const card = el('div', 'analysis');
-
-    const summary = el('div', 'analysis-row');
-    summary.append(el('span', 'analysis-label', 'Summary'), el('p', 'analysis-value', analysis.summary));
-
-    const meta = el('div', 'analysis-meta');
-    meta.append(el('span', 'category-chip', analysis.category));
-    const level = sentimentLevel(analysis.sentiment);
-    const sentiment = el('div', `sentiment sentiment-${level}`);
-    const bar = el('div', 'sentiment-bar');
-    const fill = el('div', 'sentiment-fill');
-    fill.style.width = `${analysis.sentiment}%`;
-    bar.append(fill);
-    sentiment.append(el('span', 'sentiment-label', `Sentiment ${analysis.sentiment}/100`), bar);
-    meta.append(sentiment);
-
-    const action = el('div', 'analysis-row');
-    action.append(el('span', 'analysis-label', 'Recommended action'), el('p', 'analysis-value', analysis.action));
-
-    card.append(summary, meta, action);
-    return card;
-}
-
-function displayMessage({ type, text, analysis, model, duration, isError }) {
-    const message = el('div', `message ${type}${isError ? ' error' : ''}`);
-    const wrapper = el('div', 'message-wrapper');
-
-    const header = el('div', 'message-header');
-    const avatar = el('div', 'message-avatar');
-    avatar.innerHTML = ICONS[type]; // static markup, no user data
-    const info = el('div', 'message-info');
-    info.append(el('span', 'message-sender', type === 'user' ? 'You' : 'AI Assistant'));
-    if (model) info.append(el('span', 'message-model', model));
-    header.append(avatar, info);
-
-    const bubble = el('div', 'message-bubble');
-    bubble.append(analysis ? renderAnalysis(analysis) : el('div', 'message-text', text));
-
-    const footer = el('div', 'message-footer');
-    footer.append(el('span', null, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })));
-    if (duration !== undefined) footer.append(el('span', null, `${duration.toFixed(2)}s`));
-
-    wrapper.append(header, bubble, footer);
-    message.append(wrapper);
-    els.messagesContainer.append(message);
-    scrollToBottom();
-}
-
-// --- State -----------------------------------------------------------------
-
-function updateSendButton() {
-    els.sendButton.disabled = isLoading || els.messageInput.value.trim().length === 0;
-}
-
-function setLoadingState(loading) {
-    isLoading = loading;
-    els.messageInput.disabled = loading;
-    els.loadingIndicator.hidden = !loading;
-    els.sendIcon.style.display = loading ? 'none' : 'block';
-    els.loadingSpinner.hidden = !loading;
-    updateSendButton();
-    if (loading) {
-        scrollToBottom();
-    } else {
-        els.messageInput.focus();
+    try {
+        if (controls.stream) {
+            await receiveStream(url, body, view, options);
+        } else {
+            await receiveResponse(url, body, view, options);
+        }
+    } catch (error) {
+        if (error.name !== 'AbortError') view.fail(error); // aborted = the chat was cleared
+    } finally {
+        chat.inFlight = null;
+        setBusy(false);
     }
+}
+
+// Complete mode: one JSON response once every model has answered.
+async function receiveResponse(url, body, view, options) {
+    const data = await requestJson(url, { method: 'POST', body, ...options });
+    chat.conversationId = data.conversation_id;
+    (data.results ?? [data.result]).forEach((result) => view.finish(result));
+    view.complete(data.comparison_id);
+}
+
+// Streaming mode: Server-Sent Events while the models write.
+async function receiveStream(url, body, view, options) {
+    for await (const { event, data } of streamEvents(url, { ...body, stream: true }, options)) {
+        switch (event) {
+            case 'start':
+                chat.conversationId = data.conversation_id;
+                break;
+            case 'delta':
+                view.update(data.model, data.partial);
+                followScroll();
+                break;
+            case 'result':
+                view.finish(data);
+                followScroll();
+                break;
+            case 'done':
+                view.complete(data.comparison_id);
+                break;
+            case 'error':
+                throw new ApiError(data.error.message, data.request_id);
+        }
+    }
+}
+
+async function vote(comparisonId, model) {
+    try {
+        await requestJson(withId(CONFIG.urls.vote, comparisonId), { method: 'POST', body: { model } });
+        stats.refreshIfOpen();
+    } catch (error) {
+        append(errorMessage(error));
+        throw error; // keep the card's previous vote state
+    }
+}
+
+// --- Chat state --------------------------------------------------------------
+
+function append(element) {
+    els.welcomeScreen.hidden = true;
+    els.clearBtn.hidden = false;
+    els.messagesContainer.append(element);
+    els.messagesArea.scrollTop = els.messagesArea.scrollHeight;
+}
+
+// Keeps the newest text in view while streaming, unless the user scrolled up to read.
+function followScroll() {
+    const area = els.messagesArea;
+    const nearBottom = area.scrollHeight - area.scrollTop - area.clientHeight < 120;
+    if (nearBottom) area.scrollTop = area.scrollHeight;
 }
 
 function clearChat() {
+    chat.inFlight?.abort(); // also stops the models on the server
+    const id = chat.conversationId;
+    chat.conversationId = null;
     els.messagesContainer.replaceChildren();
     els.welcomeScreen.hidden = false;
     els.clearBtn.hidden = true;
-    setLoadingState(false);
-}
-
-// --- API -------------------------------------------------------------------
-
-async function sendMessage(content) {
-    displayMessage({ type: 'user', text: content });
-    els.messageInput.value = '';
-    autoResizeTextarea();
-    els.welcomeScreen.hidden = true;
-    els.clearBtn.hidden = false;
-    setLoadingState(true);
-
-    try {
-        const response = await fetch(generateUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: content }),
-        });
-        const data = await response.json().catch(() => ({ error: `Unexpected response (HTTP ${response.status})` }));
-
-        if (!response.ok || data.error) {
-            displayMessage({ type: 'ai', text: `Error: ${data.error}`, model: modelName, isError: true });
-        } else {
-            displayMessage({ type: 'ai', analysis: data.analysis, model: data.model, duration: data.duration });
-        }
-    } catch (error) {
-        displayMessage({ type: 'ai', text: `Error: ${error.message}`, model: modelName, isError: true });
-    } finally {
-        setLoadingState(false);
+    if (id) {
+        // Forget the server-side memory too; a failure only leaves an unused conversation behind.
+        requestJson(withId(CONFIG.urls.conversation, id), { method: 'DELETE' }).catch(() => {});
     }
 }
 
-// --- Events ----------------------------------------------------------------
+// --- Input -------------------------------------------------------------------
+
+function isBusy() {
+    return chat.inFlight !== null;
+}
+
+function updateSendButton() {
+    els.sendButton.disabled = isBusy() || !els.messageInput.value.trim() || !controls.valid;
+}
+
+function setBusy(busy) {
+    els.messageInput.disabled = busy;
+    controls.setDisabled(busy);
+    els.sendIcon.style.display = busy ? 'none' : 'block';
+    els.loadingSpinner.hidden = !busy;
+    updateSendButton();
+    if (!busy) els.messageInput.focus();
+}
+
+function clearInput() {
+    els.messageInput.value = '';
+    autoResizeTextarea();
+}
 
 function autoResizeTextarea() {
     els.messageInput.style.height = 'auto';
@@ -160,8 +183,8 @@ function autoResizeTextarea() {
 function handleSubmit(event) {
     event.preventDefault();
     const content = els.messageInput.value.trim();
-    if (!content || isLoading) return;
-    sendMessage(content);
+    if (!content || isBusy() || !controls.valid) return;
+    send(content);
 }
 
 els.chatForm.addEventListener('submit', handleSubmit);

@@ -31,9 +31,9 @@ setup: venv install env
 run:
 	@$(FLASK) --app $(APP) run --debug --host $(HOST) --port $(PORT)
 
-# Production-style WSGI server
+# Production-style WSGI server. Threads keep a worker free while it waits on slow model calls.
 serve:
-	@$(GUNICORN) --workers 2 --timeout 90 --bind $(HOST):$(PORT) "$(APP):create_app()"
+	@$(GUNICORN) --workers 2 --threads 4 --timeout 180 --bind $(HOST):$(PORT) "$(APP):create_app()"
 
 test:
 	@$(PYTEST)
