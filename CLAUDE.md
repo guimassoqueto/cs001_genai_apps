@@ -1,7 +1,6 @@
-# langchain-playground
+# cs001_genai_apps
 
-A LangChain course playground. The user writes course notes; Claude writes one
-runnable LangChain script per set of notes.
+Develop Generative AI Applications. The user writes course notes;
 
 ## The standing task
 

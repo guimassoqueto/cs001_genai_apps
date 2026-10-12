@@ -1,6 +1,6 @@
-# langchain-playground
+# CS001: Develop Generative AI Applications: Get Started
 
-Scratch repo for working through a LangChain course, using Claude as the model provider.
+Certificate available at: https://www.coursera.org/account/accomplishments/verify/6T5XGQAXSARH
 
 ## Requirements
 
