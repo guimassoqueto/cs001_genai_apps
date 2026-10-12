@@ -28,6 +28,15 @@ lessons/module02/output/01_langchain_core_concepts/   # what it generates (gitig
 - Module folders are zero padded: `module02`, never `module2`.
 - A new module folder needs no configuration.
 
+### Self-contained projects
+
+A folder under `lessons/` that holds its own `pyproject.toml` (e.g.
+`lessons/module03/04_genai_flask_app/`) is an independent project, not a lesson
+script. The rules above and below do not apply to it. Follow its own README and
+Makefile, use its own `.venv`, and never import `app.config` from it or add its
+dependencies to `devtools/requirements.txt`. Add each one to `extend-exclude` in
+`devtools/pyproject.toml`.
+
 ## Writing a lesson script
 
 Cover the concepts the doc actually describes, in the doc's order, one short

@@ -4,7 +4,9 @@ target-version = "py314"
 # Markdown is documentation, not source: ruff >= 0.14 formats the Python code
 # blocks inside .md files, which rewrites hand-aligned snippets in the docs.
 # extend-exclude (not exclude) keeps ruff's own default exclusions in place.
-extend-exclude = ["*.md", "devtools"]
+# Self-contained sub-projects (own venv, pyproject and ruff config) lint themselves;
+# linting them from here would fight their own config over import sorting.
+extend-exclude = ["*.md", "devtools", "04_genai_flask_app"]
 
 [tool.ruff.lint]
 select = [

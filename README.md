@@ -79,6 +79,14 @@ Run a lesson with:
 make lesson LESSON=lessons/module02/01_langchain_core_concepts.py
 ```
 
+## Self-contained projects
+
+Some lessons are full apps instead of single scripts, e.g.
+`lessons/module03/04_genai_flask_app/`. Each one has its own venv, `pyproject.toml`,
+`Makefile`, `.env` and README, and it does not use the playground's `.venv` or
+`app/config`. Set it up and run it from inside its own folder. The root ruff config
+excludes these folders, because each project lints itself.
+
 ## Adding a lesson
 
 Drop the notes in `lessons/moduleNN/<nn>_<name>.md`. Nothing else needs wiring:
