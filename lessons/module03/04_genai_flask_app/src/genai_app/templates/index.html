@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="app-container">
+    <header class="header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="header-title">AI Assistant</h1>
+                <span class="model-badge" title="Model in use">{{ model_name }}</span>
+            </div>
+            <button id="clearBtn" class="clear-btn" type="button" hidden>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="m3 6 18 0"></path>
+                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                </svg>
+                Clear Chat
+            </button>
+        </div>
+    </header>
+
+    <main class="chat-container">
+        <div class="messages-area">
+            <div class="messages-content">
+                <div id="welcomeScreen" class="welcome-screen">
+                    <div class="welcome-icon">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
+                            <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+                            <line x1="9" y1="9" x2="9.01" y2="9"/>
+                            <line x1="15" y1="9" x2="15.01" y2="9"/>
+                        </svg>
+                    </div>
+                    <h2 class="welcome-title">Customer inquiry assistant</h2>
+                    <p class="welcome-text">Paste a customer message. Claude summarizes it, scores its sentiment, picks a category and recommends an action for the support rep.</p>
+                </div>
+
+                <div id="messagesContainer" class="messages-container" aria-live="polite"></div>
+
+                <div id="loadingIndicator" class="loading-indicator" hidden>
+                    <div class="loading-bubble">
+                        <div class="loading-content">
+                            <div class="loading-dots">
+                                <div class="dot"></div>
+                                <div class="dot"></div>
+                                <div class="dot"></div>
+                            </div>
+                            <span class="loading-text">Claude is thinking...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="messagesEnd"></div>
+            </div>
+        </div>
+
+        <div class="input-area">
+            <div class="input-content">
+                <form id="chatForm" class="chat-form">
+                    <div class="input-section">
+                        <div class="textarea-container">
+                            <textarea
+                                id="messageInput"
+                                class="message-textarea"
+                                placeholder="Type a customer message... (Enter to send, Shift+Enter for new line)"
+                                maxlength="{{ max_message_chars }}"
+                                rows="1"
+                                aria-label="Customer message"
+                            ></textarea>
+                        </div>
+
+                        <button type="submit" id="sendButton" class="send-button" aria-label="Send">
+                            <svg id="sendIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
+                            </svg>
+                            <div id="loadingSpinner" class="loading-spinner" hidden>
+                                <div class="spinner"></div>
+                            </div>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    window.APP_CONFIG = {
+        generateUrl: {{ url_for('api.generate') | tojson }},
+        modelName: {{ model_name | tojson }},
+    };
+</script>
+<script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+{% endblock %}
