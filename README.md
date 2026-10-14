@@ -104,6 +104,7 @@ that are just text go to the terminal; anything file-shaped (`.json`, `.csv`,
 Tool configuration lives in `devtools/pyproject.toml`; every command that needs it
 passes `--config devtools/pyproject.toml`.
 
-`CLAUDE.md` holds the instructions Claude Code loads automatically in a new
-session: the layout contract, how a lesson script is written, and how to verify
-one without making billed API calls.
+`AGENTS.md` holds the instructions for coding agents (Codex, Copilot, Cursor,
+...): the layout contract, how a lesson script is written, and how to verify one
+without making billed API calls. `CLAUDE.md` only imports it (`@AGENTS.md`), so
+Claude Code loads the same file. Edit `AGENTS.md`, never `CLAUDE.md`.
