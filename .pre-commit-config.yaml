@@ -4,7 +4,10 @@ repos:
     hooks:
       - id: check-yaml
       - id: check-toml
+      # uv.lock is generated, and ML dependencies (torch, chromadb, ...) push it past
+      # the 500 KB limit; the limit still guards every other file.
       - id: check-added-large-files
+        exclude: '(^|/)uv\.lock$'
       - id: detect-private-key
 
   # Fixers: they fix the staged files and re-stage the fixes instead of failing, and
