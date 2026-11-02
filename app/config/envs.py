@@ -7,6 +7,7 @@ load_dotenv()
 
 API_KEY_ENV_VAR = "ANTHROPIC_API_KEY"
 
+# Claude chat model (ChatAnthropic): module02/01-03
 DEFAULT_MODEL = "claude-sonnet-5-5"
 DEFAULT_MAX_TOKENS = 1024
 

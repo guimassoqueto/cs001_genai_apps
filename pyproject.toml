@@ -1,0 +1,65 @@
+[project]
+name = "cs001-genai-apps"
+version = "0.1.0"
+description = "Develop Generative AI Applications: course notes and runnable lesson scripts"
+requires-python = ">=3.14"
+dependencies = [
+    "langchain",
+    "langchain-anthropic",
+    "pandas",
+    "python-dotenv",
+]
+
+[dependency-groups]
+dev = [
+    "commitizen",
+    "pre-commit",
+    "ruff",
+]
+
+[tool.uv]
+# asdf owns Python (.tool-versions): use only interpreters found on PATH, never
+# download or pick a uv-managed one.
+python-preference = "only-system"
+
+# CPU-only torch: the default PyPI build pulls ~4 GB of CUDA libraries, and this
+# machine has no NVIDIA GPU. It applies only while torch is a direct dependency, so
+# when a package pulls torch in (sentence-transformers, say), add torch too.
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.ruff]
+line-length = 120
+# Markdown is documentation, not source: ruff >= 0.14 formats the Python code
+# blocks inside .md files, which rewrites hand-aligned snippets in the docs.
+# Notebooks are left as written too: ruff lints and formats .ipynb cells by default
+# (.ipynb is the only notebook format it reads).
+# extend-exclude (not exclude) keeps ruff's own default exclusions in place.
+# Self-contained sub-projects (own venv, pyproject and ruff config) lint themselves;
+# linting them from here would fight their own config over import sorting.
+extend-exclude = ["*.md", "*.ipynb", "devtools", "04_genai_flask_app"]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # Pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+tag_format = "v$version"
+version_scheme = "semver"

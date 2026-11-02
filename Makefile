@@ -1,59 +1,67 @@
-VENV=.venv
-PYTHON=$(VENV)/bin/python
-PIP=$(VENV)/bin/pip
+# asdf picks the Python version (.tool-versions) and uv installs the dependencies.
+# Handing uv that exact version makes it fail instead of falling back to another
+# Python, and rebuild .venv when .tool-versions changes.
+export UV_PYTHON := $(shell awk '$$1 == "python" {print $$2}' .tool-versions)
 
-RUFF=$(VENV)/bin/ruff
-PRE_COMMIT=$(VENV)/bin/pre-commit
-PIP_REVIEW=$(VENV)/bin/pip-review
-CZ=$(VENV)/bin/cz
-
-CONFIG=devtools/pyproject.toml
 LESSONS=lessons
-REQUIREMENTS=devtools/requirements.txt
 
-.PHONY: venv env install reinstall hooks update-hooks lint lint-check commit check-updates main lesson clean-output
-
-venv:
-	@python -m venv $(VENV)
+.PHONY: env install reinstall update check-updates hooks update-hooks lint lint-check commit main lesson clean-output
 
 env:
 	@test -f .env && echo ".env already exists, leaving it untouched." || cp devtools/.env.sample .env
 
+# Create .venv if needed and make it match uv.lock exactly.
 install:
-	@$(PIP) install --upgrade pip && $(PIP) install -r $(REQUIREMENTS)
+	@npx skills add guimassoqueto/ai-skills --skill lesson-script -a claude-code -a codex -y
+	@uv sync
 	@$(MAKE) --no-print-directory hooks
 
 reinstall:
-	@$(PIP) install --upgrade pip && $(PIP) install --force-reinstall --no-cache-dir -r $(REQUIREMENTS)
-	@$(MAKE) --no-print-directory hooks
+	@rm -rf .venv
+	@$(MAKE) --no-print-directory install
+	@npx skills update -y
+
+# Upgrade every dependency to its latest version, rewriting uv.lock.
+update:
+	@uv sync --upgrade
+
+# Show what `make update` would change, without changing anything.
+check-updates:
+	@uv lock --upgrade --dry-run
 
 hooks:
-	@$(PRE_COMMIT) install && $(PRE_COMMIT) install --hook-type commit-msg
+	@uv run pre-commit install && uv run pre-commit install --hook-type commit-msg
 
 update-hooks:
-	@$(PRE_COMMIT) autoupdate
+	@uv run pre-commit autoupdate
 
 lint:
-	@$(RUFF) check --fix --config $(CONFIG) .
-	@$(RUFF) format --config $(CONFIG) .
+	@uv run ruff check --fix .
+	@uv run ruff format .
 
 lint-check:
-	@$(RUFF) check --config $(CONFIG) .
-	@$(RUFF) format --check --config $(CONFIG) .
+	@uv run ruff check .
+	@uv run ruff format --check .
 
 commit:
-	@$(CZ) --config $(CONFIG) commit
-
-check-updates:
-	@$(PIP_REVIEW)
+	@uv run cz commit
 
 main:
-	@$(PYTHON) main.py
+	@uv run main.py
+
+# Run one lesson script from the project root. PYTHONPATH=. lets a script nested
+# under lessons/ import app.config.
+#   make lesson LESSON=lessons/moduleNN/<nn>_<name>.py
+lesson:
+	@test -n "$(LESSON)" || { echo "usage: make lesson LESSON=lessons/moduleNN/<nn>_<name>.py"; exit 1; }
+	@PYTHONPATH=. uv run $(LESSON)
 
 # Remove every output/ folder under lessons/ and the files they hold.
 # Rerun a lesson to regenerate just that lesson's output.
+# .venv folders (self-contained projects) are skipped: an installed package may
+# ship its own output/ folder.
 clean-output:
-	@dirs=$$(find $(LESSONS) -type d -name output -prune 2>/dev/null); \
+	@dirs=$$(find $(LESSONS) -name .venv -prune -o -type d -name output -prune -print 2>/dev/null); \
 	if [ -z "$$dirs" ]; then \
 		echo "no output folders to remove"; \
 	else \

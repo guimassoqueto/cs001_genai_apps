@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "lesson-script": {
+      "source": "guimassoqueto/ai-skills",
+      "sourceType": "github",
+      "skillPath": "skills/lesson-script/SKILL.md",
+      "computedHash": "5fcd70186a2db1c080dcb119631f267c162b1568cf23aaca9b83fdb377613bf4"
+    }
+  }
+}

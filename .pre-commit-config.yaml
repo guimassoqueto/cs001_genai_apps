@@ -30,23 +30,25 @@ repos:
         require_serial: true
       - id: ruff-check
         name: ruff check --fix
-        entry: devtools/fix-staged.sh .venv/bin/ruff check --fix --force-exclude --config devtools/pyproject.toml --
+        entry: devtools/fix-staged.sh .venv/bin/ruff check --fix --force-exclude --
         language: system
         types_or: [python, pyi]
         stages: [pre-commit]
         require_serial: true
       - id: ruff-format
         name: ruff format
-        entry: devtools/fix-staged.sh .venv/bin/ruff format --force-exclude --config devtools/pyproject.toml --
+        entry: devtools/fix-staged.sh .venv/bin/ruff format --force-exclude --
         language: system
         types_or: [python, pyi]
         stages: [pre-commit]
         require_serial: true
 
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v4.19.2
+    rev: v4.19.3
     hooks:
       - id: commitizen
-        entry: cz --config devtools/pyproject.toml check
-        args: [--allow-abort, --commit-msg-file]
+        # Enforce Conventional Commits format AND a short subject line.
+        # -l 72 limits the first line (header) to the Git hard limit of 72 chars.
+        entry: cz check
+        args: [--allow-abort, -l, "72", --commit-msg-file]
         stages: [commit-msg]
